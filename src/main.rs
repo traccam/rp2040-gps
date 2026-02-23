@@ -1,7 +1,8 @@
 #![no_std]
 #![no_main]
 
-use chrono::NaiveTime;
+use traccam_common::display::draw_status_display;
+use traccam_common::display::DisplayState;
 use embedded_graphics::text::Baseline;
 use embedded_graphics::prelude::{DrawTarget, Point};
 use embedded_graphics::text::Text;
@@ -99,14 +100,6 @@ async fn main(spawner: Spawner) {
     }
 }
 
-#[derive(Clone, Default)]
-pub struct DisplayState {
-    time: NaiveTime,
-    lat: f64,
-    lon: f64,
-    sats: u8,
-}
-
 static DISPLAY_SIGNAL: Signal<CriticalSectionRawMutex, DisplayState> = Signal::new();
 #[embassy_executor::task]
 async fn do_display(i2c: I2c<'static, I2C1, Async>) {
@@ -118,11 +111,6 @@ async fn do_display(i2c: I2c<'static, I2C1, Async>) {
     ).into_buffered_graphics_mode();
     display.init().unwrap();
 
-    let text_style = MonoTextStyleBuilder::new()
-        .font(&FONT_6X10)
-        .text_color(BinaryColor::On)
-        .build();
-
     let mut state = DisplayState::default();
     loop {
         display.clear(BinaryColor::Off).unwrap();
@@ -132,17 +120,7 @@ async fn do_display(i2c: I2c<'static, I2C1, Async>) {
             state = d;
         };
 
-        Text::with_baseline(&format!(15; "{} {}", state.time, state.sats).unwrap(), Point::zero(), text_style, Baseline::Top)
-            .draw(&mut display)
-            .unwrap();
-
-        Text::with_baseline(&format!(10; "N{:.5}", state.lat).unwrap(), Point::new(0, 9), text_style, Baseline::Top)
-            .draw(&mut display)
-            .unwrap();
-
-        Text::with_baseline(&format!(10; "E{:.5}", state.lon).unwrap(), Point::new(0, 18), text_style, Baseline::Top)
-            .draw(&mut display)
-            .unwrap();
+        draw_status_display(&mut display, &state);
 
         display.flush().unwrap();
         Timer::after_millis(40).await;

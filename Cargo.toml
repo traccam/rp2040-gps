@@ -28,7 +28,7 @@ embedded-alloc = "0.7.0"
 embedded-io-async = "0.6.1"
 ssd1306 = "0.10.0"
 embedded-graphics = "0.8.2"
-chrono = { version = "0.4.43", default-features = false }
+traccam_common = { git = "https://github.com/traccam/common.git", version = "0.1.0" }
 
 # cargo build/run
 [profile.dev]

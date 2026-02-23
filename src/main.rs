@@ -40,13 +40,15 @@ bind_interrupts!(struct Irqs {
 async fn main(spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
 
-    let t = do_display(I2c::new_async(p.I2C1, p.PIN_27, p.PIN_26, Irqs, i2c::Config::default()));
+    let mut i2cc = i2c::Config::default();
+    i2cc.frequency = 400_000;
+    let t = do_display(I2c::new_async(p.I2C1, p.PIN_27, p.PIN_26, Irqs, i2cc));
     spawner.spawn(t).unwrap();
 
     let mut config = uart::Config::default();
     config.baudrate = 115200;
 
-    let mut rx_buf = [0u8; 512];
+    let mut rx_buf = [0u8; 4096];
 
     let mut uart_rx = BufferedUartRx::new(p.UART0, Irqs, p.PIN_1, &mut rx_buf, config);
 
@@ -65,9 +67,12 @@ async fn main(spawner: Spawner) {
                 if b == '\n' {
                     if let Ok(mtype) = nmea.parse(buffer.as_str()) {
                         let mut state = DisplayState::default();
-                        let sats = nmea.satellites().len();
-                        state.sats = sats as _;
-                        info!("{} Fix: {} Sats: {}", mtype, nmea.fix_type, sats);
+                        let sats = nmea.satellites();
+                        let max_snr = sats.iter()
+                            .filter_map(|s| s.snr())
+                            .max_by(|l,r|l.total_cmp(r)).unwrap_or(0.0);
+                        state.sats = sats.len() as _;
+                        info!("{} Fix: {} Sats: {} PNR: {}", mtype, nmea.fix_type, sats.len(), nmea.pdop.unwrap_or(0.0));
 
                         // Checking only for latitude and longitude
                         if let (Some(lat), Some(lon)) = (nmea.latitude, nmea.longitude) {

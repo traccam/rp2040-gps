@@ -2,22 +2,15 @@
 #![no_main]
 
 use traccam_common::display::draw_status_display;
-use traccam_common::display::DisplayState;
-use embedded_graphics::text::Baseline;
-use embedded_graphics::prelude::{DrawTarget, Point};
-use embedded_graphics::text::Text;
+use traccam_common::DisplayState;
+use embedded_graphics::prelude::{DrawTarget};
 use embedded_graphics::pixelcolor::BinaryColor;
-use embedded_graphics::mono_font::ascii::{FONT_10X20, FONT_6X10, FONT_7X13};
-use embedded_graphics::mono_font::MonoTextStyleBuilder;
 use ssd1306::{I2CDisplayInterface, Ssd1306};
-use cortex_m::prelude::_embedded_hal_serial_Read;
-use embedded_graphics::Drawable;
 use defmt::*;
 use ssd1306::prelude::*;
 use defmt_rtt as _;
 use panic_probe as _;
 
-use embedded_io_async::Read;
 use embassy_executor::Spawner;
 use embassy_rp::{bind_interrupts, i2c};
 use embassy_rp::i2c::{Async, I2c};
@@ -25,11 +18,9 @@ use embassy_rp::peripherals::{I2C1, UART0};
 use embassy_rp::uart::{BufferedUartRx, BufferedInterruptHandler};
 use embassy_rp::uart;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use embassy_sync::channel::Channel;
 use embassy_time::Timer;
-use heapless::{format, String};
+use heapless::{String};
 use nmea::Nmea;
-use core::fmt::Write;
 use embassy_sync::signal::Signal;
 
 bind_interrupts!(struct Irqs {
@@ -62,7 +53,7 @@ async fn main(spawner: Spawner) {
         let mut byte = [0u8; 1];
 
         match embedded_io_async::Read::read(&mut uart_rx, &mut byte).await {
-            Ok(b) => {
+            Ok(_b) => {
                 let b = byte[0] as char;
 
                 if b == '\n' {
@@ -82,8 +73,12 @@ async fn main(spawner: Spawner) {
                             state.lon = lon;
                         }
 
-                        if let Some(time) = nmea.fix_timestamp() {
-                            state.time = time;
+                        if let Some(date) = nmea.fix_date {
+                            state.update_date(date);
+                        }
+
+                        if let Some(time) = nmea.fix_time {
+                            state.update_utc_time(time);
                         }
 
                         DISPLAY_SIGNAL.signal(state);
